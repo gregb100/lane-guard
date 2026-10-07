@@ -1,0 +1,11 @@
+{
+  "name": "@openclaw/lane-guard",
+  "version": "2.0.0",
+  "description": "Generalized cross-lane pollution barrier: per-lane protected directories, per-lane sudo arm windows, owner-gated session bindings with child inheritance",
+  "type": "module",
+  "openclaw": {
+    "extensions": [
+      "./index.js"
+    ]
+  }
+}

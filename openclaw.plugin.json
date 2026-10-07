@@ -1,0 +1,35 @@
+{
+  "id": "lane-guard",
+  "name": "Lane Guard",
+  "description": "Generalized cross-lane pollution barrier: per-lane protected directories, per-lane sudo arm windows, owner-gated session bindings with child inheritance. Fires on exec, write, edit, apply_patch at priority 900.",
+  "activation": {
+    "onStartup": true
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "lanes": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": { "type": "string" },
+            "path": { "type": "string" },
+            "protected": { "type": "boolean" },
+            "description": { "type": "string" }
+          }
+        },
+        "description": "Lanes: protected directories (protected defaults true; protected:false = bind target only)"
+      },
+      "excludePaths": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Paths excluded from all lane protection (exclusion wins)"
+      },
+      "stateDir": { "type": "string", "description": "State dir for ARMED.<lane> files and bindings.json" },
+      "armMaxMinutes": { "type": "number", "description": "Maximum arm window in minutes (default 60)" }
+    }
+  }
+}

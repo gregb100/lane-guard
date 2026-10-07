@@ -1,0 +1,10 @@
+{
+  "lanes": [
+    { "name": "tenants", "path": "/srv/tenants", "protected": true, "description": "Tenant/production trees — agent writes need an arm or a binding" },
+    { "name": "myapp", "path": "/srv/apps/myapp", "protected": false, "description": "Deploy dir kept open as a bind target ('this session is myapp only')" },
+    { "name": "archive", "path": "/srv/archive/cases", "protected": true, "description": "Case archive — protected" }
+  ],
+  "excludePaths": ["/srv/archive/cases/drafts"],
+  "stateDir": "/var/lib/lane-guard",
+  "armMaxMinutes": 60
+}

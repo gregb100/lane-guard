@@ -1,0 +1,33 @@
+#!/bin/sh
+# lane-guard-arm — arm a lane for a TTL window (minutes).
+# Per-lane: arming lane X does NOT open lane Y.
+# Usage: lane-guard-arm [minutes] [lane]   (default 60; max 60; lane required
+# unless exactly one lane is configured)
+set -eu
+STATE_DIR="/var/lib/lane-guard"
+CFG="/usr/local/lib/lane-guard/config.json"
+MAX_MINUTES=60
+MINUTES="${1:-60}"
+LANE="${2:-}"
+
+case "$MINUTES" in ''|*[!0-9]*) echo "lane-guard-arm: minutes must be a positive integer" >&2; exit 1 ;; esac
+[ "$MINUTES" -ge 1 ] 2>/dev/null || { echo "lane-guard-arm: minutes must be >= 1" >&2; exit 1; }
+[ "$MINUTES" -le "$MAX_MINUTES" ] || { echo "lane-guard-arm: $MINUTES exceeds armMaxMinutes=$MAX_MINUTES cap" >&2; exit 1; }
+
+if [ -z "$LANE" ]; then
+  echo "lane-guard-arm: lane required (e.g. tenants)" >&2; exit 1
+fi
+
+# lane must exist in config (read-only check; jq optional)
+if command -v jq >/dev/null 2>&1 && [ -r "$CFG" ]; then
+  jq -e --arg n "$LANE" '.lanes[] | select(.name == $n and .protected != false)' "$CFG" >/dev/null \
+    || { echo "lane-guard-arm: unknown or unprotected lane '$LANE'" >&2; exit 1; }
+fi
+
+mkdir -p "$STATE_DIR"
+STAMP="$(date -u -d "+$MINUTES minutes" +%Y-%m-%dT%H:%M:%SZ)"
+TMP="${STATE_DIR}/ARMED.${LANE}.tmp.$$"
+printf '%s\n' "$STAMP" > "$TMP"
+chmod 644 "$TMP"
+mv -f "$TMP" "${STATE_DIR}/ARMED.${LANE}"
+echo "lane '$LANE' armed until $STAMP (UTC)"

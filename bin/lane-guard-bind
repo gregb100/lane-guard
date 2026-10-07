@@ -1,0 +1,41 @@
+#!/bin/sh
+# lane-guard-bind — bind a session to a lane (blocks writes to other lanes).
+# The lane-guard plugin gates agent invocation on owner requester; this CLI
+# is the root writer for /var/lib/lane-guard/bindings.json.
+# Usage: lane-guard-bind <lane> <sessionKey> [--ttl-hours H]
+#        lane-guard-bind --unbind <sessionKey>
+set -eu
+STATE_DIR="/var/lib/lane-guard"
+CFG="/usr/local/lib/lane-guard/config.json"
+BINDINGS="${STATE_DIR}/bindings.json"
+
+mkdir -p "$STATE_DIR"
+[ -f "$BINDINGS" ] || printf '{}\n' > "$BINDINGS"
+
+if [ "${1:-}" = "--unbind" ]; then
+  KEY="${2:-}"
+  [ -n "$KEY" ] || { echo "lane-guard-bind: sessionKey required" >&2; exit 1; }
+  NOW_MS="$(($(date -u +%s) * 1000))"
+  jq --arg k "$KEY" --argjson now "$NOW_MS" 'del(.[$k]) | to_entries | map(select(.value.expiresAt == null or .value.expiresAt > $now)) | from_entries' "$BINDINGS" > "${BINDINGS}.tmp" && mv -f "${BINDINGS}.tmp" "$BINDINGS"
+  echo "unbound $KEY"
+  exit 0
+fi
+
+LANE="${1:-}"; KEY="${2:-}"
+[ -n "$LANE" ] && [ -n "$KEY" ] || { echo "usage: lane-guard-bind <lane> <sessionKey> [--ttl-hours H] | --unbind <sessionKey>" >&2; exit 1; }
+TTL_HOURS=24
+if [ "${3:-}" = "--ttl-hours" ] && [ -n "${4:-}" ]; then TTL_HOURS="$4"; fi
+
+command -v jq >/dev/null 2>&1 || { echo "lane-guard-bind: jq required" >&2; exit 1; }
+jq -e --arg n "$LANE" '.lanes[] | select(.name == $n)' "$CFG" >/dev/null \
+  || { echo "lane-guard-bind: unknown lane '$LANE'" >&2; exit 1; }
+
+NOW_EPOCH="$(date -u +%s)"
+NOW_MS="$((NOW_EPOCH * 1000))"
+EXPIRES_EPOCH=$((NOW_EPOCH + TTL_HOURS * 3600))
+NOW_ISO="$(date -u -d "@$NOW_EPOCH" +%Y-%m-%dT%H:%M:%SZ)"
+EXPIRES_ISO="$(date -u -d "@$EXPIRES_EPOCH" +%Y-%m-%dT%H:%M:%SZ)"
+jq --arg k "$KEY" --arg l "$LANE" --arg b "$NOW_ISO" --argjson e "$((EXPIRES_EPOCH * 1000))" --argjson now "$NOW_MS" \
+  '.[$k] = {lane: $l, boundAt: $b, expiresAt: $e} | to_entries | map(select(.value.expiresAt == null or .value.expiresAt > $now)) | from_entries' "$BINDINGS" > "${BINDINGS}.tmp" \
+  && mv -f "${BINDINGS}.tmp" "$BINDINGS"
+echo "session $KEY bound to lane '$LANE' until $EXPIRES_ISO (UTC)"
