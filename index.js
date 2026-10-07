@@ -217,6 +217,21 @@ export function decide(toolName, params, state = {}, cfg = {}) {
       return { action: "allow" };
     }
 
+    // ── owner gate for the lane CLI ──
+    // lane-guard-lane rewrites lane policy config (add/update lanes); only an
+    // owner-originated request may run it through the agent lane. (sudoers
+    // still governs the binary; this gate stops non-owner sessions from
+    // invoking it via tools.)
+    if (tool === "exec" && typeof params?.command === "string" && params.command.includes("lane-guard-lane")) {
+      if (!st.requesterIsOwner) {
+        return {
+          action: "block",
+          blockReason: makeBlockReason("lane-guard-lane requires owner requester", params.command),
+        };
+      }
+      return { action: "allow" };
+    }
+
     // ── write/edit ──
     if (tool === "write" || tool === "edit") {
       const path = params?.path;

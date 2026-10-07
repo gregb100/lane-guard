@@ -1,0 +1,55 @@
+#!/bin/sh
+# lane-guard-lane — add or update a lane in the root-owned config.
+# Agent-invocable self-serve lane writer: adds a new lane or flips an
+# existing lane's protected flag. Never deletes (removal = Greg's sudo).
+# Usage: lane-guard-lane <name> <path> <true|false> [description]
+#        lane-guard-lane --config <cfg> <name> <path> <true|false> [description]
+# Exit codes: 0 written · 1 bad args/unknown lane (update-only enforced) · 2 io/parse failure
+set -eu
+
+CFG="/usr/local/lib/lane-guard/config.json"
+if [ "${1:-}" = "--config" ]; then CFG="${2:?}"; shift 2; fi
+
+NAME="${1:-}"; PATH_ARG="${2:-}"; PROTECTED="${3:-}"; DESC="${4:-}"
+
+usage() { echo "usage: lane-guard-lane [--config <cfg>] <name> <path> <true|false> [description]" >&2; exit 1; }
+[ -n "$NAME" ] && [ -n "$PATH_ARG" ] && [ -n "$PROTECTED" ] || usage
+
+# name: lowercase alnum + dashes only (policy identifiers stay simple)
+case "$NAME" in
+  *[!a-z0-9-]* ) echo "lane-guard-lane: name must be lowercase alnum/dashes: '$NAME'" >&2; exit 1 ;;
+esac
+# path: absolute only
+case "$PATH_ARG" in
+  /*) ;;
+  *) echo "lane-guard-lane: path must be absolute: '$PATH_ARG'" >&2; exit 1 ;;
+esac
+case "$PROTECTED" in
+  true|false) ;;
+  *) echo "lane-guard-lane: protected must be true or false: '$PROTECTED'" >&2; exit 1 ;;
+esac
+
+command -v jq >/dev/null 2>&1 || { echo "lane-guard-lane: jq required" >&2; exit 2; }
+
+[ -r "$CFG" ] || { echo "lane-guard-lane: config not readable: $CFG" >&2; exit 2; }
+jq -e '.lanes' "$CFG" >/dev/null 2>&1 || { echo "lane-guard-lane: config has no lanes array" >&2; exit 2; }
+
+EXISTS="$(jq -r --arg n "$NAME" '[.lanes[] | select(.name == $n)] | length' "$CFG")"
+if [ "$EXISTS" = "0" ]; then
+  # create mode: path must not be an exact or prefix duplicate of an existing lane
+  if jq -e --arg p "$PATH_ARG" '[.lanes[] | select(.path == $p)] | length > 0' "$CFG" >/dev/null 2>&1; then
+    echo "lane-guard-lane: a lane already owns path '$PATH_ARG'" >&2; exit 1
+  fi
+  NEW_LANE="{\"name\": \"$NAME\", \"path\": \"$PATH_ARG\", \"protected\": $PROTECTED"
+  [ -n "$DESC" ] && NEW_LANE="$NEW_LANE, \"description\": \"$DESC\""
+  NEW_LANE="$NEW_LANE}"
+  jq --argjson lane "$NEW_LANE" '.lanes += [$lane]' "$CFG" > "$CFG.tmp.$$" \
+    && mv -f "$CFG.tmp.$$" "$CFG"
+  echo "lane '$NAME' added: $PATH_ARG (protected=$PROTECTED)"
+else
+  # update mode: name must exist (no silent create via update)
+  jq --arg n "$NAME" --argjson p "$PROTECTED" \
+    '.lanes = [.lanes[] | if .name == $n then .protected = $p else . end]' "$CFG" > "$CFG.tmp.$$" \
+    && mv -f "$CFG.tmp.$$" "$CFG"
+  echo "lane '$NAME' protected=$PROTECTED"
+fi

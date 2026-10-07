@@ -12,6 +12,10 @@ import {
   bindingActive,
   decide,
 } from "./index.js";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, writeFileSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 let pass = 0, fail = 0;
 
@@ -151,6 +155,46 @@ ok("block reason mentions lane-guard",
   decide("write", { path: "/srv/tenants/pull.sh" }, U, cfg).blockReason.includes("lane-guard"), true);
 ok("patch alias → block",
   decide("patch", { input: "*** Update File: /srv/tenants/x\n*** End Patch" }, U, cfg).action, "block");
+
+console.log("\n[decide — lane-guard-lane CLI owner gate]");
+ok("exec lane-guard-lane owner → allow",
+  decide("exec", { command: "sudo /usr/local/lib/lane-guard/bin/lane-guard-lane app /srv/app false" }, { ...U, requesterIsOwner: true }, cfg).action, "allow");
+ok("exec lane-guard-lane non-owner → block",
+  decide("exec", { command: "sudo /usr/local/lib/lane-guard/bin/lane-guard-lane app /srv/app false" }, { ...U, requesterIsOwner: false }, cfg).action, "block");
+ok("exec lane-guard-lane (no requester) → block",
+  decide("exec", { command: "sudo /usr/local/lib/lane-guard/bin/lane-guard-lane app /srv/app false" }, U, cfg).action, "block");
+
+console.log("\n[bin/lane-guard-lane — self-serve lane add/update CLI]");
+{
+  const dir = mkdtempSync(join(tmpdir(), "lane-guard-cli-"));
+  const cfgPath = join(dir, "config.json");
+  const orig = readFileSync("./config.example.json", "utf8");
+  writeFileSync(cfgPath, orig);
+  const CLI = join("bin", "lane-guard-lane");
+  const run = (args) => spawnSync("sh", [CLI, ...args], { encoding: "utf8" });
+
+  const r1 = run(["--config", cfgPath, "app2", "/srv/apps/app2", "false"]);
+  ok("add new lane → exit 0", r1.status, 0);
+  const c1 = JSON.parse(readFileSync(cfgPath, "utf8"));
+  const added = c1.lanes.find((l) => l.name === "app2");
+  ok("added lane present + protected false", added && added.protected, false);
+  ok("existing lanes preserved", c1.lanes.some((l) => l.name === "tenants"), true);
+  ok("non-lane config keys preserved", c1.stateDir !== undefined, true);
+
+  const r2 = run(["--config", cfgPath, "app2", "/srv/apps/app2", "true"]);
+  ok("update existing lane → exit 0", r2.status, 0);
+  const c2 = JSON.parse(readFileSync(cfgPath, "utf8"));
+  ok("protected flipped true", c2.lanes.find((l) => l.name === "app2").protected, true);
+  ok("no duplicate lanes", c2.lanes.filter((l) => l.name === "app2").length, 1);
+
+  ok("missing args → exit 1", run(["--config", cfgPath, "app3"]).status, 1);
+  ok("bad protected value → exit 1", run(["--config", cfgPath, "app3", "/srv/a", "maybe"]).status, 1);
+  ok("bad name chars → exit 1", run(["--config", cfgPath, "App X", "/srv/a", "true"]).status, 1);
+  ok("relative path → exit 1", run(["--config", cfgPath, "app4", "srv/a", "true"]).status, 1);
+  ok("missing config file → exit 2 (io failure, no create)", run(["--config", join(dir, "nope.json"), "x", "/srv/x", "true"]).status, 2);
+  const c3 = JSON.parse(readFileSync(cfgPath, "utf8"));
+  ok("failed adds wrote nothing", c3.lanes.some((l) => l.name === "app3" || l.name === "app4"), false);
+}
 
 // ─── Summary ───
 console.log("\n" + pass + " passed, " + fail + " failed");
