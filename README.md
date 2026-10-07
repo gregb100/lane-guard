@@ -20,6 +20,7 @@ lane-guard is an [OpenClaw](https://github.com/openclaw/openclaw) gateway plugin
 | Plugin (`index.js`) | `before_tool_call` policy on exec/write/edit/patch + `subagent_spawned` binding inheritance |
 | `bin/lane-guard-arm` | Open one lane for a TTL window (minutes, capped) — `sudo` NOPASSWD-able |
 | `bin/lane-guard-bind` | Bind/unbind a session key to a lane (owner-gated, TTL, prune-on-write) |
+| `bin/lane-guard-lane` | Owner-gated lane add/update (add lane or flip `protected`; never deletes) |
 | `config.json` | All policy: lanes (`{name, path, protected}`), exclusions, caps — root-owned |
 | `test-lane-guard.mjs` | Pure-function suite — 58 tests, zero external deps |
 
@@ -37,16 +38,16 @@ sudo chmod 755 /usr/local/lib/lane-guard/bin/*
 sudo mkdir -p /var/lib/lane-guard && sudo sh -c 'echo "{}" > /var/lib/lane-guard/bindings.json'
 ```
 
-Then add both CLIs to sudoers (NOPASSWD), point `openclaw.json` `plugins.load.paths` at `/usr/local/lib/lane-guard`, and restart the gateway. See `SKILL.md` and `DOCUMENT_MAP.md`.
+Then add all three CLIs to sudoers (NOPASSWD), point `openclaw.json` `plugins.load.paths` at `/usr/local/lib/lane-guard`, and restart the gateway. See `SKILL.md` and `DOCUMENT_MAP.md`.
 
 ## Test
 
 ```bash
-node test-lane-guard.mjs   # 58 passed
+node test-lane-guard.mjs   # 74 passed
 ```
 
 The suite imports the plugin SDK via `node_modules/openclaw` — symlink to your global OpenClaw install if needed. No other dependencies.
 
 ## Quick start policy
 
-Copy `config.example.json` → `config.json`, define your lanes, restart. Adding a lane later is one line and no code change.
+Copy `config.example.json` → `config.json`, define your lanes, restart. Adding a lane later: `sudo .../bin/lane-guard-lane <name> <path> <true|false>` — one command, no restart.

@@ -19,6 +19,7 @@ A root-owned OpenClaw plugin that blocks agent writes to protected directories (
 | Session bindings | `/var/lib/lane-guard/bindings.json` |
 | Arm CLI | `sudo /usr/local/lib/lane-guard/bin/lane-guard-arm <minutes> <lane>` (NOPASSWD-able, cap from config) |
 | Bind CLI | `sudo /usr/local/lib/lane-guard/bin/lane-guard-bind <lane> <sessionKey> [--ttl-hours H]` / `--unbind <sessionKey>` |
+| Lane CLI | `sudo /usr/local/lib/lane-guard/bin/lane-guard-lane <name> <path> <true|false> [description]` (owner-gated add/update; never deletes) |
 | Test suite | `cd /usr/local/lib/lane-guard && node test-lane-guard.mjs` |
 
 ## Semantics (law)
@@ -29,6 +30,7 @@ A root-owned OpenClaw plugin that blocks agent writes to protected directories (
 - **Exclusions win over everything** (`excludePaths` in config).
 - Bindings are **per-session** (`sessionKey`-keyed): fencing one session never hinders another. Spawned children inherit the parent binding. TTL default 24h, evaluated at read; every CLI write prunes stale rows.
 - `lane-guard-bind` via agent exec requires **owner requester** (`requester.senderIsOwner === true`); non-owner sessions cannot bind, rebind, or unbind through the agent lane.
+- `lane-guard-lane` via agent exec requires **owner requester** too. It adds a new lane or flips an existing lane's `protected` flag (absolute paths, lowercase-dash names); **lane removal stays a manual root edit** — the CLI never deletes.
 - Any unlisted directory is unprotected — normal agent workspace, unchanged behavior.
 
 ## Current lanes
@@ -53,7 +55,7 @@ sudo cat /usr/local/lib/lane-guard/config.json
 3. Do the write. No disarm step exists; the window just lapses.
 
 ### Adding a lane
-One line in the root-owned `config.json` (operator's sudo). No code change; no restart needed — config is read fresh per tool call.
+Owner says "add lane X" / "lock lane X" → `sudo -n /usr/local/lib/lane-guard/bin/lane-guard-lane <name> <path> <true|false> [description]` (owner-gated; NOPASSWD via sudoers). No code change; no restart — config is read fresh per tool call. **Lane removal stays the operator's manual root edit** — the CLI never deletes a lane.
 
 ### Verifying the barrier
 1. `node test-lane-guard.mjs` in the installed dir → full suite green.

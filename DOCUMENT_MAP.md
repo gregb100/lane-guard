@@ -9,8 +9,9 @@
 | Plugin code | `index.js` (pure policy fns + `register()`) |
 | Arm CLI | `bin/lane-guard-arm` (per-lane TTL window, capped) |
 | Bind CLI | `bin/lane-guard-bind` (session↔lane bindings, TTL default 24h, prune-on-write) |
+| Lane CLI | `bin/lane-guard-lane` (owner-gated lane add/update; removal = manual root edit) |
 | Lane policy config | `config.json` (lanes / excludePaths / stateDir / armMaxMinutes) — `config.example.json` is the template |
-| Test suite | `test-lane-guard.mjs` — `node test-lane-guard.mjs` (58 tests) |
+| Test suite | `test-lane-guard.mjs` — `node test-lane-guard.mjs` (74 tests) |
 | Design record | `PROOF.md` (REQUIRE / DELETE / manual proof / machine owners) |
 | Agent skill | `SKILL.md` (this repo); live copy at the gateway workspace skills dir |
 | Runtime state (not in repo) | `/var/lib/lane-guard/` — `ARMED.<lane>`, `bindings.json` |
