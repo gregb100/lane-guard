@@ -14,6 +14,7 @@ No REST API, no UI, no NLP lane parsing, no unbind daemon (TTL evaluated at read
 ## Machine owners
 - `decide()` in `index.js` — all policy (pure, tested).
 - Root-owned `config.json` — lane list; policy changes need the operator's sudo.
+- `bin/lane-guard-lane` — owner-gated self-serve lane add/update (writes the `config.json` lanes array; add new lane or flip `protected`; **never deletes** — removal stays a manual root edit). Plugin exec gate + sudoers NOPASSWD; exit 0 written / 1 bad-args / 2 io-or-parse.
 - `/var/lib/lane-guard/ARMED.<lane>` — per-lane arm windows (written by `bin/lane-guard-arm`, sudo-gated, capped).
 - `/var/lib/lane-guard/bindings.json` — session→lane bindings (written by `bin/lane-guard-bind`, owner-gated by the plugin).
 - Plugin `register()` — reads state fresh per tool call; `subagent_spawned` propagates parent bindings to children.
