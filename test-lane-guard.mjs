@@ -12,6 +12,7 @@ import {
   bindingActive,
   decide,
 } from "./index.js";
+import laneGuardEntry from "./index.js";
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -194,6 +195,62 @@ console.log("\n[bin/lane-guard-lane — self-serve lane add/update CLI]");
   ok("missing config file → exit 2 (io failure, no create)", run(["--config", join(dir, "nope.json"), "x", "/srv/x", "true"]).status, 2);
   const c3 = JSON.parse(readFileSync(cfgPath, "utf8"));
   ok("failed adds wrote nothing", c3.lanes.some((l) => l.name === "app3" || l.name === "app4"), false);
+}
+
+// ─── LG-001: register() must NOT cache lanes config across tool calls ───
+console.log("\n[LG-001 — fresh cfg per tool call (plugin level)]");
+{
+  const stateDir = mkdtempSync(join(tmpdir(), "lane-guard-state-"));
+  const handlers = {};
+  const fakeApi = {
+    pluginConfig: { lanes: [{ name: "tenants", path: "/srv/tenants" }], stateDir, armMaxMinutes: 60 },
+    on: (name, handler) => { handlers[name] = handler; },
+    logger: console,
+  };
+  laneGuardEntry.register(fakeApi);
+  const call = (toolName, params, sessionKey = "s-test") =>
+    handlers.before_tool_call({ toolName, params }, { sessionKey, requester: { senderIsOwner: false } });
+
+  // Sanity (passes on cached cfg too): unarmed write into a live lane → block
+  ok("LG-001 sanity: unarmed write into live lane → block",
+    (await call("write", { path: "/srv/tenants/x" })).block, true);
+
+  // RED: lane added AFTER register() must protect on the NEXT tool call
+  fakeApi.pluginConfig.lanes.push({ name: "newlane", path: "/srv/newlane" });
+  ok("LG-001: post-register lane add protects next call (fresh cfg)",
+    (await call("write", { path: "/srv/newlane/x" })).block, true);
+
+  // RED: lane REMOVED after register() must not protect next call (fresh cfg)
+  fakeApi.pluginConfig.lanes = fakeApi.pluginConfig.lanes.filter((l) => l.name !== "tenants");
+  ok("LG-001: post-register lane removal stops protecting next call",
+    (await call("write", { path: "/srv/tenants/y" }))?.block ?? false, false);
+}
+
+// ─── LG-002: owner-gate must NOT allow the whole chained command ───
+console.log("\n[LG-002 — owner gate: no whole-chain bypass]");
+{
+  const OWNER_BOUND_TENANTS = { ...U, requesterIsOwner: true, binding: BOUND_TENANTS };
+  const bindCLI = "/usr/local/lib/lane-guard/bin/lane-guard-bind";
+
+  // Non-owner: whole chain blocked (fail-closed) — passes today
+  ok("LG-002 sanity: non-owner chained bind+write → block",
+    decide("exec", { command: `sudo ${bindCLI} tenants s1 --ttl-hours 1 && echo hi > /srv/archive/cases/probe.txt` },
+      U, cfg).action, "block");
+
+  // RED: owner, bound to tenants, chained bind CLI + write into ANOTHER protected lane → block
+  ok("LG-002: owner chained bind CLI + cross-lane write → block",
+    decide("exec", { command: `sudo ${bindCLI} tenants s1 --ttl-hours 1 && echo hi > /srv/archive/cases/probe.txt` },
+      OWNER_BOUND_TENANTS, cfg).action, "block");
+
+  // RED: owner, chained lane-guard-lane CLI + cross-lane write → block
+  ok("LG-002: owner chained lane-guard-lane CLI + cross-lane write → block",
+    decide("exec", { command: `sudo /usr/local/lib/lane-guard/bin/lane-guard-lane app2 /srv/app2 true # lane-guard-lane add; write: echo x > /srv/archive/cases/probe.txt` },
+      OWNER_BOUND_TENANTS, cfg).action, "block");
+
+  // Owner running the bind CLI alone (no chained write) → still allow
+  ok("LG-002: owner bind CLI alone → allow",
+    decide("exec", { command: `sudo ${bindCLI} tenants s1 --ttl-hours 1` },
+      OWNER_BOUND_TENANTS, cfg).action, "allow");
 }
 
 // ─── Summary ───

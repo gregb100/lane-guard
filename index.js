@@ -214,7 +214,9 @@ export function decide(toolName, params, state = {}, cfg = {}) {
           blockReason: makeBlockReason("lane-guard-bind requires owner requester", params.command),
         };
       }
-      return { action: "allow" };
+      // LG-002: owner falls THROUGH to the normal exec scan below — the CLI
+      // invocation itself touches no lane, but a chained write into a
+      // protected lane must still be checked. Never allow the whole command.
     }
 
     // ── owner gate for the lane CLI ──
@@ -229,7 +231,7 @@ export function decide(toolName, params, state = {}, cfg = {}) {
           blockReason: makeBlockReason("lane-guard-lane requires owner requester", params.command),
         };
       }
-      return { action: "allow" };
+      // LG-002: owner falls THROUGH — same rule as the bind gate above.
     }
 
     // ── write/edit ──
@@ -386,11 +388,14 @@ function buildPluginEntry() {
       },
     },
     register(api) {
-      const cfg = resolveConfig(api);
-
+      // LG-001: lanes config is resolved FRESH on every tool call (and every
+      // subagent_spawned) — never cached across the plugin lifetime. A lane
+      // added/removed via lane-guard-lane must protect/unprotect the next
+      // call without a gateway restart.
       api.on(
         "before_tool_call",
         async (event, ctx) => {
+          const cfg = resolveConfig(api);
           const toolName = event?.toolName;
           const params = event?.params;
           if (!toolName || !params) return;
@@ -421,6 +426,7 @@ function buildPluginEntry() {
       // Child inheritance: a spawned subagent inherits the parent's lane binding.
       api.on("subagent_spawned", async (event, ctx) => {
         try {
+          const cfg = resolveConfig(api);
           const childKey = event?.childSessionKey || event?.targetSessionKey;
           const parentKey = event?.parentSessionKey || ctx?.sessionKey;
           if (!childKey || !parentKey) return;
