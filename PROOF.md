@@ -9,7 +9,8 @@ No REST API, no UI, no NLP lane parsing, no unbind daemon (TTL evaluated at read
 ## Manual proof
 - The friction exists: on the origin host, a routine agent operation (credential rotation in a deployed app under a protected tree) required an explicit human arm — the live case that motivated generalizing from a single-path guard to lanes.
 - Barrier proven live: during the generalization sweep, the running plugin blocked the authoring agent's own command whose text merely *mentioned* a protected path — over-approximation working as designed.
-- Suite: `node test-lane-guard.mjs` → **58 passed, 0 failed** (RED-first throughout).
+- Suite: `node test-lane-guard.mjs` → **81 passed, 0 failed** (RED-first throughout).
+- Live-case proof (2026-10-11, LG-001/LG-002): adversarial probes on the running gateway caught (a) a stale-cached lanes config — lane adds/removals never took effect until a restart, producing both false-allow (cross-lane write landed under the wrong lane resolution) and false-block (correctly-bound session rejected) — and (b) an owner-gate whole-chain bypass (a chained command merely containing the bind/lane CLI literal skipped the write scan). Both fixed RED→GREEN (81/0) and re-verified live on the fresh generation: cross-lane blocked under the correct lane names, own-lane allowed, chain bypasses closed.
 
 ## Machine owners
 - `decide()` in `index.js` — all policy (pure, tested).

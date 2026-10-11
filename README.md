@@ -22,7 +22,7 @@ lane-guard is an [OpenClaw](https://github.com/openclaw/openclaw) gateway plugin
 | `bin/lane-guard-bind` | Bind/unbind a session key to a lane (owner-gated, TTL, prune-on-write) |
 | `bin/lane-guard-lane` | Owner-gated lane add/update (add lane or flip `protected`; never deletes) |
 | `config.json` | All policy: lanes (`{name, path, protected}`), exclusions, caps — root-owned |
-| `test-lane-guard.mjs` | Pure-function suite — 58 tests, zero external deps |
+| `test-lane-guard.mjs` | Pure-function suite — 81 tests, zero external deps |
 
 **Semantics in one paragraph:** a write to a protected lane is blocked unless that lane is armed *or* the calling session is bound to it. `protected: false` lanes are bind-only targets (their subtree is claimed away from enclosing protected lanes by longest-path match). Unprotected directories behave exactly as before — install changes nothing outside the lanes you list. Exclusions override everything. Bindings key by session: one session's fence never hinders another. Binding through the agent path requires the owner's own request.
 
@@ -43,7 +43,7 @@ Then add all three CLIs to sudoers (NOPASSWD), point `openclaw.json` `plugins.lo
 ## Test
 
 ```bash
-node test-lane-guard.mjs   # 74 passed
+node test-lane-guard.mjs   # 81 passed
 ```
 
 The suite imports the plugin SDK via `node_modules/openclaw` — symlink to your global OpenClaw install if needed. No other dependencies.

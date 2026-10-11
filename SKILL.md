@@ -68,5 +68,5 @@ Owner says "add lane X" / "lock lane X" → `sudo -n /usr/local/lib/lane-guard/b
 - Never edit `/usr/local/lib/lane-guard` directly as an agent; policy changes route through the operator.
 - Never treat a binding as a lock on the directory — it fences the session, not other seats.
 - Never arm for reads.
-- If the plugin generation is stale after policy edits, a gateway restart lands it; until then the previous generation stays active (fail-safe).
+- Lane **policy** edits (`lane-guard-lane`, `config.json`) take effect on the next tool call — no restart. **Code** changes to `index.js` need the runtime sync + a gateway restart; until then the previous generation stays active (fail-safe).
 - Repo source of truth is canonical; runtime is a root-owned copy of it. Verify parity after any sync.

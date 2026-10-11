@@ -11,7 +11,7 @@
 | Bind CLI | `bin/lane-guard-bind` (session↔lane bindings, TTL default 24h, prune-on-write) |
 | Lane CLI | `bin/lane-guard-lane` (owner-gated lane add/update; removal = manual root edit) |
 | Lane policy config | `config.json` (lanes / excludePaths / stateDir / armMaxMinutes) — `config.example.json` is the template |
-| Test suite | `test-lane-guard.mjs` — `node test-lane-guard.mjs` (74 tests) |
+| Test suite | `test-lane-guard.mjs` — `node test-lane-guard.mjs` (81 tests) |
 | Design record | `PROOF.md` (REQUIRE / DELETE / manual proof / machine owners) |
 | Agent skill | `SKILL.md` (this repo); live copy at the gateway workspace skills dir |
 | Runtime state (not in repo) | `/var/lib/lane-guard/` — `ARMED.<lane>`, `bindings.json` |
@@ -20,7 +20,7 @@
 
 - **PROMPT** — AI agents with broad filesystem reach must not write across protected directory boundaries ("lanes") without an explicit, human-granted, time-boxed permission.
 - **TASKS** — 1. Plugin blocks exec/write/edit/apply_patch on protected lanes. 2. Per-lane arm CLIs (TTL, sudo-gated). 3. Owner-gated session bindings + subagent inheritance. 4. Skill + tests + docs.
-- **GOALS** — Cross-lane write blocked unless armed/bound (58-test suite green); unarmed reads never blocked; other sessions never hindered by another session's binding; all permission windows expire.
+- **GOALS** — Cross-lane write blocked unless armed/bound (81-test suite green); unarmed reads never blocked; other sessions never hindered by another session's binding; all permission windows expire.
 - **TOOLS** — OpenClaw plugin hooks (`before_tool_call`, `subagent_spawned`), `sudo` NOPASSWD sudoers, `jq` (bind CLI), node test suite.
 - **DATA** — `config.json` lanes, `/var/lib/lane-guard/*` arm/bind state, tool-call params.
 - **OUTPUTS** — allow/block decisions, ARMED files, bindings.json, this map.
