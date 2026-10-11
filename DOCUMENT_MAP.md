@@ -3,7 +3,7 @@
 | What you are looking for | Where it lives |
 |---|---|
 | Source of truth | this repo (`~/projects/lane-guard/`) |
-| GitHub remote | `https://github.com/gregb100/lane-guard.git` (private) |
+| GitHub remote | `https://github.com/gregb100/lane-guard.git` (public) |
 | Runtime install target (root-owned policy) | `/usr/local/lib/lane-guard/` |
 | Dev/extension copy | `~/.openclaw/extensions/lane-guard/` |
 | Plugin code | `index.js` (pure policy fns + `register()`) |
